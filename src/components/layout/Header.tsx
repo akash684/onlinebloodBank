@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
-  DropletIcon, 
+  DropIcon, 
   BellIcon, 
   UserIcon, 
   SunIcon, 
@@ -35,7 +35,7 @@ export const Header: React.FC = () => {
               whileHover={{ scale: 1.1 }}
               className="p-2 bg-red-600 rounded-lg"
             >
-              <DropletIcon className="h-6 w-6 text-white" />
+              <DropIcon className="h-6 w-6 text-white" />
             </motion.div>
             <span className="text-xl font-bold text-gray-900 dark:text-white">
               BloodBank+

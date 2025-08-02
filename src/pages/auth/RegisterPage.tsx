@@ -7,7 +7,7 @@ import {
   LockClosedIcon, 
   PhoneIcon,
   MapPinIcon,
-  DropletIcon
+  DropIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/Button'
@@ -123,7 +123,7 @@ export const RegisterPage: React.FC = () => {
           className="text-center"
         >
           <div className="mx-auto h-12 w-12 bg-red-600 rounded-full flex items-center justify-center">
-            <DropletIcon className="h-6 w-6 text-white" />
+            <DropIcon className="h-6 w-6 text-white" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
             Create your account
