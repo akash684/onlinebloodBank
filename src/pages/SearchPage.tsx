@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { 
   MagnifyingGlassIcon,
   MapPinIcon,
-  DropletIcon,
+  DropIcon,
   BuildingOfficeIcon,
   PhoneIcon
 } from '@heroicons/react/24/outline'
@@ -288,7 +288,7 @@ export const SearchPage: React.FC = () => {
                                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                                   >
                                     <div className="flex items-center space-x-2">
-                                      <DropletIcon className="h-4 w-4 text-red-600" />
+                                      <DropIcon className="h-4 w-4 text-red-600" />
                                       <span className="font-medium text-gray-900 dark:text-white">
                                         {bloodType.type}
                                       </span>
@@ -353,7 +353,7 @@ export const SearchPage: React.FC = () => {
             animate={{ opacity: 1 }}
             className="text-center py-12"
           >
-            <DropletIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <DropIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Search for Blood Banks
             </h3>
