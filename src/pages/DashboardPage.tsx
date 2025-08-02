@@ -94,7 +94,7 @@ export const DashboardPage: React.FC = () => {
         setStats(prev => ({
           ...prev,
           totalDonations: donations.filter(d => d.status === 'completed').length,
-          scheduledDonations: donations.filter(d => d.status === 'scheduled').length
+          scheduledDonations: donations.filter(d => d.status === 'pending').length
         }))
       } else if (profile.role === 'blood_bank' || profile.role === 'admin') {
         const inventory = results[0]?.data || []

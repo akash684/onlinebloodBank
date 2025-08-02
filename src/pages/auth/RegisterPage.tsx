@@ -42,7 +42,6 @@ export const RegisterPage: React.FC = () => {
     confirmPassword: '',
     name: '',
     phone: '',
-    location: '',
     role: 'donor' as 'donor' | 'recipient' | 'blood_bank' | 'admin',
     blood_type: 'O+'
   })
@@ -89,9 +88,6 @@ export const RegisterPage: React.FC = () => {
       newErrors.phone = 'Phone number is required'
     }
 
-    if (!formData.location) {
-      newErrors.location = 'Location is required'
-    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -210,17 +206,6 @@ export const RegisterPage: React.FC = () => {
                 required
               />
 
-              <Input
-                label="Location"
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                error={errors.location}
-                icon={<MapPinIcon className="h-5 w-5" />}
-                placeholder="Enter your city/location"
-                required
-              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select

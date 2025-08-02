@@ -10,7 +10,7 @@ interface UserProfile {
   role: 'donor' | 'recipient' | 'blood_bank' | 'admin'
   blood_type: string
   phone: string
-  location: string
+  is_active: boolean
 }
 
 interface AuthContextType {
