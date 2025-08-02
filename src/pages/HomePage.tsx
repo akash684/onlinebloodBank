@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
-  DropIcon, 
+  WaterDropIcon, 
   HeartIcon, 
   UserGroupIcon, 
   ClockIcon,
@@ -18,7 +18,7 @@ export const HomePage: React.FC = () => {
 
   const features = [
     {
-      icon: <DropIcon className="h-8 w-8" />,
+      icon: <WaterDropIcon className="h-8 w-8" />,
       title: 'Real-time Inventory',
       description: 'Track blood availability across multiple blood banks in real-time.'
     },

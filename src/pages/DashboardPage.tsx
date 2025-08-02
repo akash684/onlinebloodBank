@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   ChartBarIcon,
-  DropIcon,
+  WaterDropIcon,
   UsersIcon,
   ClockIcon,
   ExclamationTriangleIcon,
@@ -143,7 +143,7 @@ export const DashboardPage: React.FC = () => {
           {
             title: 'Total Donations',
             value: stats.totalDonations,
-            icon: <DropIcon className="h-8 w-8" />,
+            icon: <WaterDropIcon className="h-8 w-8" />,
             color: 'text-red-600',
             bgColor: 'bg-red-100 dark:bg-red-900/20'
           },
@@ -179,7 +179,7 @@ export const DashboardPage: React.FC = () => {
           {
             title: 'Available Units',
             value: stats.availableUnits,
-            icon: <DropIcon className="h-8 w-8" />,
+            icon: <WaterDropIcon className="h-8 w-8" />,
             color: 'text-red-600',
             bgColor: 'bg-red-100 dark:bg-red-900/20'
           },
@@ -350,7 +350,7 @@ export const DashboardPage: React.FC = () => {
                     <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="flex-shrink-0">
                         <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full">
-                          <DropIcon className="h-4 w-4 text-red-600" />
+                          <WaterDropIcon className="h-4 w-4 text-red-600" />
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
