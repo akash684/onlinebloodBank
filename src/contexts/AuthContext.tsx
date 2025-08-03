@@ -1,3 +1,4 @@
+// =================== AuthContext.tsx ===================
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -41,7 +42,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
@@ -52,12 +52,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     })
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
-        
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
@@ -90,24 +88,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) throw error
 
       if (data.user) {
-        // Create user profile
         const { error: profileError } = await supabase
           .from('users')
-          .insert([
-            {
-              id: data.user.id,
-              email,
-              ...userData,
-            }
-          ])
+          .insert([{ id: data.user.id, email, ...userData }])
 
         if (profileError) throw profileError
         toast.success('Account created successfully!')
@@ -120,11 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       toast.success('Welcome back!')
     } catch (error: any) {
@@ -155,7 +138,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', user.id)
 
       if (error) throw error
-
       setProfile(prev => prev ? { ...prev, ...updates } : null)
       toast.success('Profile updated successfully')
     } catch (error: any) {
@@ -164,16 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  const value = {
-    user,
-    profile,
-    session,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-    updateProfile,
-  }
+  const value = { user, profile, session, loading, signUp, signIn, signOut, updateProfile }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
+

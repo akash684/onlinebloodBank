@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { 
+import {
   MagnifyingGlassIcon,
   MapPinIcon,
-  WaterDropIcon,
+  BeakerIcon,
   BuildingOfficeIcon,
   PhoneIcon
 } from '@heroicons/react/24/outline'
@@ -45,7 +45,6 @@ export const SearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Sample data - in a real app, this would come from your database
   const sampleResults: BloodBankResult[] = [
     {
       id: '1',
@@ -91,33 +90,30 @@ export const SearchPage: React.FC = () => {
   const handleSearch = async () => {
     setLoading(true)
     setHasSearched(true)
-    
+
     try {
-      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Filter results based on search criteria
       let filteredResults = sampleResults
-      
+
       if (searchQuery) {
-        filteredResults = filteredResults.filter(result => 
+        filteredResults = filteredResults.filter(result =>
           result.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           result.location.toLowerCase().includes(searchQuery.toLowerCase())
         )
       }
-      
+
       if (selectedBloodType) {
         filteredResults = filteredResults.filter(result =>
           result.bloodTypes.some(bt => bt.type === selectedBloodType && bt.quantity > 0)
         )
       }
-      
+
       if (location) {
         filteredResults = filteredResults.filter(result =>
           result.location.toLowerCase().includes(location.toLowerCase())
         )
       }
-      
+
       setResults(filteredResults)
     } catch (error) {
       console.error('Search error:', error)
@@ -143,7 +139,7 @@ export const SearchPage: React.FC = () => {
     const today = new Date()
     const diffTime = date.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
+
     if (diffDays <= 3) return `${diffDays} days`
     if (diffDays <= 7) return `${diffDays} days`
     return date.toLocaleDateString()
@@ -152,7 +148,6 @@ export const SearchPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -166,7 +161,6 @@ export const SearchPage: React.FC = () => {
           </p>
         </motion.div>
 
-        {/* Search Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -181,14 +175,14 @@ export const SearchPage: React.FC = () => {
                 onKeyPress={handleKeyPress}
                 icon={<MagnifyingGlassIcon className="h-5 w-5" />}
               />
-              
+
               <Select
                 options={BLOOD_TYPES}
                 value={selectedBloodType}
                 onChange={(e) => setSelectedBloodType(e.target.value)}
                 className="w-full"
               />
-              
+
               <Input
                 placeholder="Location/City"
                 value={location}
@@ -196,7 +190,7 @@ export const SearchPage: React.FC = () => {
                 onKeyPress={handleKeyPress}
                 icon={<MapPinIcon className="h-5 w-5" />}
               />
-              
+
               <Button
                 onClick={handleSearch}
                 loading={loading}
@@ -208,7 +202,6 @@ export const SearchPage: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Results */}
         {loading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -220,108 +213,85 @@ export const SearchPage: React.FC = () => {
             transition={{ delay: 0.2 }}
           >
             {results.length > 0 ? (
-              <>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Found {results.length} blood bank{results.length !== 1 ? 's' : ''}
-                  </h2>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>Good Stock</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <span>Low Stock</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      <span>Critical</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-6">
-                  {results.map((result, index) => (
-                    <motion.div
-                      key={result.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card hover className="p-6">
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                                  {result.name}
-                                </h3>
-                                <div className="flex items-center text-gray-600 dark:text-gray-400 mb-2">
-                                  <MapPinIcon className="h-4 w-4 mr-2" />
-                                  <span>{result.location}</span>
-                                </div>
-                                <div className="flex items-center text-gray-600 dark:text-gray-400">
-                                  <PhoneIcon className="h-4 w-4 mr-2" />
-                                  <span>{result.phone}</span>
-                                </div>
+              <div className="space-y-6">
+                {results.map((result, index) => (
+                  <motion.div
+                    key={result.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Card hover className="p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                {result.name}
+                              </h3>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400 mb-2">
+                                <MapPinIcon className="h-4 w-4 mr-2" />
+                                <span>{result.location}</span>
                               </div>
-                              <div className="text-right">
-                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                                  {result.totalUnits}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  Total Units
-                                </div>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <PhoneIcon className="h-4 w-4 mr-2" />
+                                <span>{result.phone}</span>
                               </div>
                             </div>
-                            
-                            {/* Available Blood Types */}
-                            <div className="mb-4">
-                              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                Available Blood Types:
-                              </h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {result.bloodTypes.map((bloodType) => (
-                                  <div
-                                    key={bloodType.type}
-                                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                                  >
-                                    <div className="flex items-center space-x-2">
-                                      <WaterDropIcon className="h-4 w-4 text-red-600" />
-                                      <span className="font-medium text-gray-900 dark:text-white">
-                                        {bloodType.type}
-                                      </span>
-                                    </div>
-                                    <div className="text-right">
-                                      <Badge
-                                        variant={getUrgencyColor(bloodType.quantity)}
-                                        size="sm"
-                                      >
-                                        {bloodType.quantity}
-                                      </Badge>
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        Exp: {formatExpiryDate(bloodType.expiry)}
-                                      </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                {result.totalUnits}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Total Units
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                              Available Blood Types:
+                            </h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              {result.bloodTypes.map((bloodType) => (
+                                <div
+                                  key={bloodType.type}
+                                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <BeakerIcon className="h-4 w-4 text-red-600" /> {/* Fixed: Replaced DropletIcon */}
+                                    <span className="font-medium text-gray-900 dark:text-white">
+                                      {bloodType.type}
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <Badge
+                                      variant={getUrgencyColor(bloodType.quantity)}
+                                      size="sm"
+                                    >
+                                      {bloodType.quantity}
+                                    </Badge>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Exp: {formatExpiryDate(bloodType.expiry)}
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                          
-                          <div className="lg:ml-6 mt-4 lg:mt-0">
-                            <Button className="w-full lg:w-auto">
-                              <BuildingOfficeIcon className="h-4 w-4 mr-2" />
-                              Contact Blood Bank
-                            </Button>
-                          </div>
                         </div>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </>
+
+                        <div className="lg:ml-6 mt-4 lg:mt-0">
+                          <Button className="w-full lg:w-auto">
+                            <BuildingOfficeIcon className="h-4 w-4 mr-2" />
+                            Contact Blood Bank
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
             ) : (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -353,7 +323,7 @@ export const SearchPage: React.FC = () => {
             animate={{ opacity: 1 }}
             className="text-center py-12"
           >
-            <WaterDropIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <BeakerIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" /> {/* Fixed: Replaced DropletIcon */}
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Search for Blood Banks
             </h3>
@@ -363,7 +333,6 @@ export const SearchPage: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Emergency Notice */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

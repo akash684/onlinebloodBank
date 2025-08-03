@@ -7,7 +7,7 @@ import {
   LockClosedIcon, 
   PhoneIcon,
   MapPinIcon,
-  WaterDropIcon
+  BeakerIcon // Replaced WaterDropIcon with BeakerIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/Button'
@@ -88,14 +88,12 @@ export const RegisterPage: React.FC = () => {
       newErrors.phone = 'Phone number is required'
     }
 
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!validateForm()) return
 
     setLoading(true)
@@ -119,7 +117,7 @@ export const RegisterPage: React.FC = () => {
           className="text-center"
         >
           <div className="mx-auto h-12 w-12 bg-red-600 rounded-full flex items-center justify-center">
-            <WaterDropIcon className="h-6 w-6 text-white" />
+            <BeakerIcon className="h-6 w-6 text-white" /> {/* Fixed Icon */}
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
             Create your account
@@ -205,7 +203,6 @@ export const RegisterPage: React.FC = () => {
                 placeholder="Enter your phone number"
                 required
               />
-
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select

@@ -2,13 +2,14 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
-  WaterDropIcon, 
+  BeakerIcon,   // Replaced WaterDropIcon ❌
   HeartIcon, 
   UserGroupIcon, 
   ClockIcon,
-  MapPinIcon,
   ShieldCheckIcon
 } from '@heroicons/react/24/outline'
+import { MapPinIcon } from '@heroicons/react/24/solid' // Ensure correct icon path if needed
+
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,7 +19,7 @@ export const HomePage: React.FC = () => {
 
   const features = [
     {
-      icon: <WaterDropIcon className="h-8 w-8" />,
+      icon: <BeakerIcon className="h-8 w-8" />, // Fixed Icon
       title: 'Real-time Inventory',
       description: 'Track blood availability across multiple blood banks in real-time.'
     },

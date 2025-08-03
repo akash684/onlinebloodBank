@@ -12,30 +12,42 @@ import { RegisterPage } from './pages/auth/RegisterPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SearchPage } from './pages/SearchPage'
 
-// Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth()
-  
+  const { user, profile, loading } = useAuth()
+
   if (loading) {
     return <PageLoader />
   }
-  
-  return user ? <>{children}</> : <Navigate to="/login" replace />
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500 dark:text-gray-400">Loading profile...</p>
+      </div>
+    )
+  }
+
+  return <>{children}</>
 }
 
-// Public Route component (redirects to dashboard if logged in)
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth()
-  
+
   if (loading) {
     return <PageLoader />
   }
-  
+
   return !user ? <>{children}</> : <Navigate to="/dashboard" replace />
 }
 
 function AppContent() {
-  const { loading } = useAuth()
+  const { loading, user, profile } = useAuth()
+  console.log("AppContent - user:", user)
+  console.log("AppContent - profile:", profile)
 
   if (loading) {
     return <PageLoader />
@@ -48,45 +60,14 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route 
-            path="/login" 
-            element={
-              <PublicRoute>
-                <LoginPage />
-              </PublicRoute>
-            } 
-          />
-          <Route 
-            path="/register" 
-            element={
-              <PublicRoute>
-                <RegisterPage />
-              </PublicRoute>
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            } 
-          />
-          {/* Catch all route */}
+          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       <Footer />
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: 'var(--toast-bg)',
-            color: 'var(--toast-color)',
-          },
-        }}
-      />
+      <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: 'var(--toast-bg)', color: 'var(--toast-color)' } }} />
     </div>
   )
 }
@@ -103,4 +84,4 @@ function App() {
   )
 }
 
-export default App
+export default App;
