@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { 
   ChartBarIcon,
   UsersIcon,
   ClockIcon,
   ExclamationTriangleIcon,
-  CalendarIcon
+  CalendarIcon,
+  WaterDropIcon,
+  BellIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -13,22 +19,49 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
-import { Link } from 'react-router-dom'
+import toast from 'react-hot-toast'
 
 interface DashboardStats {
   totalDonations: number
   scheduledDonations: number
   bloodRequests: number
   availableUnits: number
+  completedDonations: number
+  pendingRequests: number
 }
 
-interface RecentActivity {
+interface ScheduledDonation {
   id: string
-  type: 'donation' | 'request' | 'inventory'
-  title: string
-  description: string
-  date: string
+  donation_date: string
+  blood_bank: { name: string }
   status: string
+  blood_group: string
+}
+
+interface DonationHistory {
+  id: string
+  donation_date: string
+  blood_bank: { name: string }
+  blood_group: string
+  status: string
+}
+
+interface BloodRequest {
+  id: string
+  blood_group: string
+  quantity: number
+  status: string
+  created_at: string
+  patient_name?: string
+  urgency?: string
+}
+
+interface Notification {
+  id: string
+  message: string
+  type: string
+  created_at: string
+  is_read: boolean
 }
 
 export const DashboardPage: React.FC = () => {
@@ -37,14 +70,65 @@ export const DashboardPage: React.FC = () => {
     totalDonations: 0,
     scheduledDonations: 0,
     bloodRequests: 0,
-    availableUnits: 0
+    availableUnits: 0,
+    completedDonations: 0,
+    pendingRequests: 0
   })
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [scheduledDonations, setScheduledDonations] = useState<ScheduledDonation[]>([])
+  const [donationHistory, setDonationHistory] = useState<DonationHistory[]>([])
+  const [bloodRequests, setBloodRequests] = useState<BloodRequest[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchDashboardData()
+    setupRealtimeSubscriptions()
   }, [profile])
+
+  const setupRealtimeSubscriptions = () => {
+    if (!profile) return
+
+    // Subscribe to notifications
+    const notificationChannel = supabase
+      .channel('notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'bloodbank',
+          table: 'notifications',
+          filter: `user_id=eq.${profile.id}`
+        },
+        (payload) => {
+          const newNotification = payload.new as Notification
+          setNotifications(prev => [newNotification, ...prev])
+          toast.success(newNotification.message)
+        }
+      )
+      .subscribe()
+
+    // Subscribe to blood requests updates
+    if (profile.role === 'blood_bank' || profile.role === 'admin') {
+      const requestsChannel = supabase
+        .channel('blood_requests')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'bloodbank',
+            table: 'blood_requests'
+          },
+          () => {
+            fetchDashboardData()
+          }
+        )
+        .subscribe()
+    }
+
+    return () => {
+      supabase.removeChannel(notificationChannel)
+    }
+  }
 
   const fetchDashboardData = async () => {
     if (!profile) return
@@ -52,78 +136,128 @@ export const DashboardPage: React.FC = () => {
     try {
       setLoading(true)
       
-      // Fetch stats based on user role
-      const promises = []
-
+      // Fetch based on user role
       if (profile.role === 'donor') {
-        // Get donor's donation history
-        promises.push(
-          supabase
-            .from('donation_history')
-            .select('*')
-            .eq('donor_id', profile.id)
-        )
+        await fetchDonorData()
       } else if (profile.role === 'recipient') {
-        // Get recipient's blood requests
-        promises.push(
-          supabase
-            .from('blood_requests')
-            .select('*')
-            .eq('requester_id', profile.id)
-        )
+        await fetchRecipientData()
       } else if (profile.role === 'blood_bank' || profile.role === 'admin') {
-        // Get inventory data
-        promises.push(
-          supabase
-            .from('blood_inventory')
-            .select('*')
-        )
-        promises.push(
-          supabase
-            .from('blood_requests')
-            .select('*')
-        )
+        await fetchBloodBankData()
       }
 
-      const results = await Promise.all(promises)
-      
-      // Process results based on role
-      if (profile.role === 'donor') {
-        const donations = results[0]?.data || []
-        setStats(prev => ({
-          ...prev,
-          totalDonations: donations.filter(d => d.status === 'completed').length,
-          scheduledDonations: donations.filter(d => d.status === 'pending').length
-        }))
-      } else if (profile.role === 'blood_bank' || profile.role === 'admin') {
-        const inventory = results[0]?.data || []
-        const requests = results[1]?.data || []
-        
-        setStats(prev => ({
-          ...prev,
-          availableUnits: inventory.reduce((sum, item) => sum + item.quantity, 0),
-          bloodRequests: requests.filter(r => r.status === 'pending').length
-        }))
-      }
-
-      // Generate sample recent activity
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'donation',
-          title: 'Blood Donation Scheduled',
-          description: 'Your donation appointment is confirmed for tomorrow',
-          date: new Date().toISOString(),
-          status: 'scheduled'
-        },
-        
-      ])
+      // Fetch notifications for all users
+      await fetchNotifications()
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
+      toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchDonorData = async () => {
+    // Fetch donation history
+    const { data: donations } = await supabase
+      .from('donation_history')
+      .select(`
+        *,
+        blood_bank:blood_bank_id (name)
+      `)
+      .eq('donor_id', profile?.id)
+      .order('donation_date', { ascending: false })
+
+    if (donations) {
+      setDonationHistory(donations)
+      const scheduled = donations.filter(d => d.status === 'pending')
+      const completed = donations.filter(d => d.status === 'completed')
+      
+      setScheduledDonations(scheduled)
+      setStats(prev => ({
+        ...prev,
+        totalDonations: donations.length,
+        scheduledDonations: scheduled.length,
+        completedDonations: completed.length
+      }))
+    }
+  }
+
+  const fetchRecipientData = async () => {
+    // Fetch blood requests
+    const { data: requests } = await supabase
+      .from('blood_requests')
+      .select('*')
+      .eq('requester_id', profile?.id)
+      .order('created_at', { ascending: false })
+
+    if (requests) {
+      setBloodRequests(requests)
+      const pending = requests.filter(r => r.status === 'pending')
+      
+      setStats(prev => ({
+        ...prev,
+        bloodRequests: requests.length,
+        pendingRequests: pending.length
+      }))
+    }
+  }
+
+  const fetchBloodBankData = async () => {
+    // Fetch inventory
+    const { data: inventory } = await supabase
+      .from('blood_inventory')
+      .select('*')
+      .eq('blood_bank_id', profile?.id)
+
+    // Fetch requests assigned to this blood bank
+    const { data: requests } = await supabase
+      .from('blood_requests')
+      .select('*')
+      .eq('assigned_bank', profile?.id)
+      .order('created_at', { ascending: false })
+
+    if (inventory) {
+      const totalUnits = inventory.reduce((sum, item) => sum + item.quantity, 0)
+      setStats(prev => ({
+        ...prev,
+        availableUnits: totalUnits
+      }))
+    }
+
+    if (requests) {
+      setBloodRequests(requests)
+      const pending = requests.filter(r => r.status === 'pending')
+      
+      setStats(prev => ({
+        ...prev,
+        bloodRequests: requests.length,
+        pendingRequests: pending.length
+      }))
+    }
+  }
+
+  const fetchNotifications = async () => {
+    const { data: notifications } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', profile?.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (notifications) {
+      setNotifications(notifications)
+    }
+  }
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+
+    setNotifications(prev =>
+      prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+    )
   }
 
   const getGreeting = () => {
@@ -134,15 +268,13 @@ export const DashboardPage: React.FC = () => {
   }
 
   const getRoleSpecificStats = () => {
-    const commonClasses = "p-6"
-    
     switch (profile?.role) {
       case 'donor':
         return [
           {
             title: 'Total Donations',
-            value: stats.totalDonations,
-            
+            value: stats.completedDonations,
+            icon: <WaterDropIcon className="h-8 w-8" />,
             color: 'text-red-600',
             bgColor: 'bg-red-100 dark:bg-red-900/20'
           },
@@ -155,7 +287,7 @@ export const DashboardPage: React.FC = () => {
           },
           {
             title: 'Lives Saved',
-            value: stats.totalDonations * 3, // Estimate: 1 donation saves ~3 lives
+            value: stats.completedDonations * 3,
             icon: <UsersIcon className="h-8 w-8" />,
             color: 'text-green-600',
             bgColor: 'bg-green-100 dark:bg-green-900/20'
@@ -165,11 +297,18 @@ export const DashboardPage: React.FC = () => {
       case 'recipient':
         return [
           {
-            title: 'Active Requests',
+            title: 'Total Requests',
             value: stats.bloodRequests,
             icon: <ExclamationTriangleIcon className="h-8 w-8" />,
             color: 'text-orange-600',
             bgColor: 'bg-orange-100 dark:bg-orange-900/20'
+          },
+          {
+            title: 'Pending',
+            value: stats.pendingRequests,
+            icon: <ClockIcon className="h-8 w-8" />,
+            color: 'text-yellow-600',
+            bgColor: 'bg-yellow-100 dark:bg-yellow-900/20'
           }
         ]
       
@@ -178,20 +317,20 @@ export const DashboardPage: React.FC = () => {
           {
             title: 'Available Units',
             value: stats.availableUnits,
-            
+            icon: <WaterDropIcon className="h-8 w-8" />,
             color: 'text-red-600',
             bgColor: 'bg-red-100 dark:bg-red-900/20'
           },
           {
             title: 'Pending Requests',
-            value: stats.bloodRequests,
+            value: stats.pendingRequests,
             icon: <ClockIcon className="h-8 w-8" />,
             color: 'text-yellow-600',
             bgColor: 'bg-yellow-100 dark:bg-yellow-900/20'
           },
           {
-            title: 'Total Inventory',
-            value: stats.availableUnits,
+            title: 'Total Requests',
+            value: stats.bloodRequests,
             icon: <ChartBarIcon className="h-8 w-8" />,
             color: 'text-purple-600',
             bgColor: 'bg-purple-100 dark:bg-purple-900/20'
@@ -204,15 +343,16 @@ export const DashboardPage: React.FC = () => {
     switch (profile?.role) {
       case 'donor':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link to="/donate">
-              <Button className="w-full">
-                Schedule Donation
+          <div className="grid grid-cols-1 gap-3">
+            <Link to="/schedule">
+              <Button className="w-full flex items-center justify-center space-x-2">
+                <PlusIcon className="h-4 w-4" />
+                <span>Schedule Donation</span>
               </Button>
             </Link>
             <Link to="/history">
               <Button variant="outline" className="w-full">
-                View History
+                View Full History
               </Button>
             </Link>
           </div>
@@ -220,10 +360,11 @@ export const DashboardPage: React.FC = () => {
       
       case 'recipient':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link to="/request">
-              <Button className="w-full">
-                Request Blood
+          <div className="grid grid-cols-1 gap-3">
+            <Link to="/search">
+              <Button className="w-full flex items-center justify-center space-x-2">
+                <PlusIcon className="h-4 w-4" />
+                <span>Request Blood</span>
               </Button>
             </Link>
             <Link to="/search">
@@ -236,22 +377,13 @@ export const DashboardPage: React.FC = () => {
       
       default:
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link to="/inventory">
-              <Button className="w-full">
-                Manage Inventory
-              </Button>
-            </Link>
-            <Link to="/requests">
-              <Button variant="outline" className="w-full">
-                Review Requests
-              </Button>
-            </Link>
-            <Link to="/reports">
-              <Button variant="outline" className="w-full">
-                View Reports
-              </Button>
-            </Link>
+          <div className="grid grid-cols-1 gap-3">
+            <Button className="w-full">
+              Manage Inventory
+            </Button>
+            <Button variant="outline" className="w-full">
+              Review Requests
+            </Button>
           </div>
         )
     }
@@ -332,7 +464,7 @@ export const DashboardPage: React.FC = () => {
             </Card>
           </motion.div>
 
-          {/* Recent Activity */}
+          {/* Recent Activity / Notifications */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -340,40 +472,58 @@ export const DashboardPage: React.FC = () => {
             className="lg:col-span-2"
           >
             <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Recent Activity
-              </h3>
-              {recentActivity.length > 0 ? (
-                <div className="space-y-4">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Recent Notifications
+                </h3>
+                <BellIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              {notifications.length > 0 ? (
+                <div className="space-y-3">
+                  {notifications.map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={`
+                        flex items-start space-x-3 p-3 rounded-lg cursor-pointer transition-colors
+                        ${notification.is_read 
+                          ? 'bg-gray-50 dark:bg-gray-700' 
+                          : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                        }
+                      `}
+                      onClick={() => !notification.is_read && markNotificationAsRead(notification.id)}
+                    >
                       <div className="flex-shrink-0">
-                        <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full">
-                          
+                        <div className={`p-2 rounded-full ${
+                          notification.is_read 
+                            ? 'bg-gray-200 dark:bg-gray-600' 
+                            : 'bg-blue-100 dark:bg-blue-900/30'
+                        }`}>
+                          <BellIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {activity.title}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {activity.description}
+                        <p className={`text-sm ${
+                          notification.is_read 
+                            ? 'text-gray-600 dark:text-gray-400' 
+                            : 'text-gray-900 dark:text-white font-medium'
+                        }`}>
+                          {notification.message}
                         </p>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          {new Date(activity.date).toLocaleDateString()}
+                          {new Date(notification.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <Badge variant="info" size="sm">
-                        {activity.status}
-                      </Badge>
+                      {!notification.is_read && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <ClockIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <BellIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 dark:text-gray-400">
-                    No recent activity to show
+                    No notifications yet
                   </p>
                 </div>
               )}
@@ -381,12 +531,50 @@ export const DashboardPage: React.FC = () => {
           </motion.div>
         </div>
 
+        {/* Role-specific content */}
+        {profile?.role === 'donor' && scheduledDonations.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-8"
+          >
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Upcoming Donations
+              </h3>
+              <div className="space-y-3">
+                {scheduledDonations.slice(0, 3).map((donation) => (
+                  <div key={donation.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full">
+                        <CalendarIcon className="h-4 w-4 text-red-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {donation.blood_bank.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(donation.donation_date).toLocaleDateString()} • {donation.blood_group}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="info" size="sm">
+                      {donation.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Emergency Notice */}
         {profile?.role === 'recipient' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.6 }}
             className="mt-8"
           >
             <Card className="p-6 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10">
