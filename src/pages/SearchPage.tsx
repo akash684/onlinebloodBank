@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   MagnifyingGlassIcon,
   MapPinIcon,
   BeakerIcon,
   BuildingOfficeIcon,
-  PhoneIcon
+  PhoneIcon,
+  ExclamationTriangleIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+import { BloodTypeCard } from '../components/blood/BloodTypeCard'
+import { BloodRequestModal } from '../components/blood/BloodRequestModal'
+import { BloodBankCard } from '../components/blood/BloodBankCard'
+import toast from 'react-hot-toast'
 
 const BLOOD_TYPES = [
   { value: '', label: 'All Blood Types' },
@@ -27,96 +34,162 @@ const BLOOD_TYPES = [
   { value: 'O-', label: 'O-' }
 ]
 
+interface BloodInventory {
+  id: string
+  blood_group: string
+  quantity: number
+  expiry_date: string
+  status: string
+  blood_bank: {
+    id: string
+    name: string
+    phone: string
+    email: string
+  }
+}
+
 interface BloodBankResult {
   id: string
   name: string
-  location: string
   phone: string
-  bloodTypes: { type: string; quantity: number; expiry: string }[]
+  email: string
+  bloodTypes: { type: string; quantity: number; expiry: string; inventoryId: string }[]
   totalUnits: number
-  distance?: number
 }
 
 export const SearchPage: React.FC = () => {
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBloodType, setSelectedBloodType] = useState('')
   const [location, setLocation] = useState('')
   const [results, setResults] = useState<BloodBankResult[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
+  const [selectedBloodBank, setSelectedBloodBank] = useState<BloodBankResult | null>(null)
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
 
-  const sampleResults: BloodBankResult[] = [
-    {
-      id: '1',
-      name: 'City General Blood Bank',
-      location: 'Downtown Medical Center, 123 Main St',
-      phone: '+1 (555) 123-4567',
-      totalUnits: 45,
-      bloodTypes: [
-        { type: 'O+', quantity: 12, expiry: '2025-02-15' },
-        { type: 'A+', quantity: 8, expiry: '2025-02-10' },
-        { type: 'B+', quantity: 6, expiry: '2025-02-12' },
-        { type: 'AB+', quantity: 4, expiry: '2025-02-08' }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Regional Medical Blood Services',
-      location: 'North Campus, 456 Health Ave',
-      phone: '+1 (555) 987-6543',
-      totalUnits: 32,
-      bloodTypes: [
-        { type: 'O-', quantity: 5, expiry: '2025-02-18' },
-        { type: 'A-', quantity: 7, expiry: '2025-02-14' },
-        { type: 'B-', quantity: 3, expiry: '2025-02-16' },
-        { type: 'O+', quantity: 10, expiry: '2025-02-11' }
-      ]
-    },
-    {
-      id: '3',
-      name: 'Community Blood Center',
-      location: 'Westside Medical Plaza, 789 Care Blvd',
-      phone: '+1 (555) 456-7890',
-      totalUnits: 28,
-      bloodTypes: [
-        { type: 'A+', quantity: 9, expiry: '2025-02-13' },
-        { type: 'AB-', quantity: 2, expiry: '2025-02-09' },
-        { type: 'B+', quantity: 8, expiry: '2025-02-17' },
-        { type: 'O+', quantity: 6, expiry: '2025-02-12' }
-      ]
+  useEffect(() => {
+    // Set up real-time subscription for inventory updates
+    const subscription = supabase
+      .channel('inventory-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'bloodbank',
+          table: 'blood_inventory'
+        },
+        (payload) => {
+          console.log('Inventory updated:', payload)
+          if (hasSearched) {
+            handleSearch() // Refresh search results
+          }
+        }
+      )
+      .subscribe()
+
+    setRealtimeSubscription(subscription)
+
+    return () => {
+      if (realtimeSubscription) {
+        supabase.removeChannel(realtimeSubscription)
+      }
     }
-  ]
+  }, [hasSearched])
 
   const handleSearch = async () => {
     setLoading(true)
     setHasSearched(true)
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      let filteredResults = sampleResults
+      // Build query for blood inventory with blood bank details
+      let query = supabase
+        .from('blood_inventory')
+        .select(`
+          id,
+          blood_group,
+          quantity,
+          expiry_date,
+          status,
+          blood_bank:blood_bank_id (
+            id,
+            name,
+            phone,
+            email
+          )
+        `)
+        .eq('status', 'available')
+        .gt('quantity', 0)
+        .gte('expiry_date', new Date().toISOString().split('T')[0])
 
-      if (searchQuery) {
-        filteredResults = filteredResults.filter(result =>
-          result.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          result.location.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      }
-
+      // Apply blood type filter
       if (selectedBloodType) {
-        filteredResults = filteredResults.filter(result =>
-          result.bloodTypes.some(bt => bt.type === selectedBloodType && bt.quantity > 0)
-        )
+        query = query.eq('blood_group', selectedBloodType)
       }
 
-      if (location) {
-        filteredResults = filteredResults.filter(result =>
-          result.location.toLowerCase().includes(location.toLowerCase())
-        )
+      // Apply search query filter (blood bank name)
+      if (searchQuery) {
+        const { data: bloodBanks } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'blood_bank')
+          .ilike('name', `%${searchQuery}%`)
+
+        if (bloodBanks && bloodBanks.length > 0) {
+          const bloodBankIds = bloodBanks.map(bb => bb.id)
+          query = query.in('blood_bank_id', bloodBankIds)
+        } else {
+          // No matching blood banks found
+          setResults([])
+          setLoading(false)
+          return
+        }
       }
 
-      setResults(filteredResults)
-    } catch (error) {
+      const { data: inventory, error } = await query
+
+      if (error) throw error
+
+      // Group inventory by blood bank
+      const bloodBankMap = new Map<string, BloodBankResult>()
+
+      inventory?.forEach((item: BloodInventory) => {
+        const bankId = item.blood_bank.id
+        
+        if (!bloodBankMap.has(bankId)) {
+          bloodBankMap.set(bankId, {
+            id: bankId,
+            name: item.blood_bank.name,
+            phone: item.blood_bank.phone,
+            email: item.blood_bank.email,
+            bloodTypes: [],
+            totalUnits: 0
+          })
+        }
+
+        const bank = bloodBankMap.get(bankId)!
+        bank.bloodTypes.push({
+          type: item.blood_group,
+          quantity: item.quantity,
+          expiry: item.expiry_date,
+          inventoryId: item.id
+        })
+        bank.totalUnits += item.quantity
+      })
+
+      const searchResults = Array.from(bloodBankMap.values())
+      setResults(searchResults)
+
+      if (searchResults.length === 0) {
+        toast.error('No blood banks found matching your criteria')
+      } else {
+        toast.success(`Found ${searchResults.length} blood bank(s) with available blood`)
+      }
+
+    } catch (error: any) {
       console.error('Search error:', error)
+      toast.error('Failed to search blood banks. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -126,6 +199,15 @@ export const SearchPage: React.FC = () => {
     if (e.key === 'Enter') {
       handleSearch()
     }
+  }
+
+  const handleRequestBlood = (bloodBank: BloodBankResult) => {
+    if (!user) {
+      toast.error('Please login to request blood')
+      return
+    }
+    setSelectedBloodBank(bloodBank)
+    setShowRequestModal(true)
   }
 
   const getUrgencyColor = (quantity: number) => {
@@ -140,20 +222,39 @@ export const SearchPage: React.FC = () => {
     const diffTime = date.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    if (diffDays <= 3) return `${diffDays} days`
-    if (diffDays <= 7) return `${diffDays} days`
-    return date.toLocaleDateString()
+    if (diffDays <= 3) return { text: `${diffDays} days`, urgent: true }
+    if (diffDays <= 7) return { text: `${diffDays} days`, urgent: false }
+    return { text: date.toLocaleDateString(), urgent: false }
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setSelectedBloodType('')
+    setLocation('')
+    setHasSearched(false)
+    setResults([])
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+          <div className="flex justify-center mb-6">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="p-4 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-lg"
+            >
+              <BeakerIcon className="h-12 w-12 text-white" />
+            </motion.div>
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent mb-4">
             Find Blood Banks & Available Blood
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
@@ -161,12 +262,13 @@ export const SearchPage: React.FC = () => {
           </p>
         </motion.div>
 
+        {/* Search Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="p-6 mb-8">
+          <Card className="p-6 mb-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Input
                 placeholder="Search blood banks..."
@@ -174,13 +276,14 @@ export const SearchPage: React.FC = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
                 icon={<MagnifyingGlassIcon className="h-5 w-5" />}
+                className="transition-all duration-200 focus:scale-105"
               />
 
               <Select
                 options={BLOOD_TYPES}
                 value={selectedBloodType}
                 onChange={(e) => setSelectedBloodType(e.target.value)}
-                className="w-full"
+                className="w-full transition-all duration-200 focus:scale-105"
               />
 
               <Input
@@ -189,159 +292,126 @@ export const SearchPage: React.FC = () => {
                 onChange={(e) => setLocation(e.target.value)}
                 onKeyPress={handleKeyPress}
                 icon={<MapPinIcon className="h-5 w-5" />}
+                className="transition-all duration-200 focus:scale-105"
               />
 
               <Button
                 onClick={handleSearch}
                 loading={loading}
-                className="w-full"
+                className="w-full transform transition-all duration-200 hover:scale-105 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
               >
+                <MagnifyingGlassIcon className="h-4 w-4 mr-2" />
                 Search
               </Button>
             </div>
           </Card>
         </motion.div>
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : hasSearched ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            {results.length > 0 ? (
-              <div className="space-y-6">
-                {results.map((result, index) => (
-                  <motion.div
-                    key={result.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <Card hover className="p-6">
-                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-4">
-                            <div>
-                              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                                {result.name}
-                              </h3>
-                              <div className="flex items-center text-gray-600 dark:text-gray-400 mb-2">
-                                <MapPinIcon className="h-4 w-4 mr-2" />
-                                <span>{result.location}</span>
-                              </div>
-                              <div className="flex items-center text-gray-600 dark:text-gray-400">
-                                <PhoneIcon className="h-4 w-4 mr-2" />
-                                <span>{result.phone}</span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                                {result.totalUnits}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                Total Units
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mb-4">
-                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                              Available Blood Types:
-                            </h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              {result.bloodTypes.map((bloodType) => (
-                                <div
-                                  key={bloodType.type}
-                                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                                >
-                                  <div className="flex items-center space-x-2">
-                                    <BeakerIcon className="h-4 w-4 text-red-600" /> {/* Fixed: Replaced DropletIcon */}
-                                    <span className="font-medium text-gray-900 dark:text-white">
-                                      {bloodType.type}
-                                    </span>
-                                  </div>
-                                  <div className="text-right">
-                                    <Badge
-                                      variant={getUrgencyColor(bloodType.quantity)}
-                                      size="sm"
-                                    >
-                                      {bloodType.quantity}
-                                    </Badge>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      Exp: {formatExpiryDate(bloodType.expiry)}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="lg:ml-6 mt-4 lg:mt-0">
-                          <Button className="w-full lg:w-auto">
-                            <BuildingOfficeIcon className="h-4 w-4 mr-2" />
-                            Contact Blood Bank
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-12"
-              >
-                <MagnifyingGlassIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  No blood banks found
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">
-                  Try adjusting your search criteria or location.
+        {/* Results */}
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex justify-center py-12"
+            >
+              <div className="text-center">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4 text-gray-600 dark:text-gray-400">
+                  Searching blood banks...
                 </p>
-                <Button variant="outline" onClick={() => {
-                  setSearchQuery('')
-                  setSelectedBloodType('')
-                  setLocation('')
-                  setHasSearched(false)
-                  setResults([])
-                }}>
-                  Clear Search
-                </Button>
-              </motion.div>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12"
-          >
-            <BeakerIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" /> {/* Fixed: Replaced DropletIcon */}
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Search for Blood Banks
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400">
-              Enter your search criteria above to find blood banks and check availability.
-            </p>
-          </motion.div>
-        )}
+              </div>
+            </motion.div>
+          ) : hasSearched ? (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              {results.length > 0 ? (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                      Found {results.length} Blood Bank{results.length !== 1 ? 's' : ''}
+                    </h2>
+                    <Button variant="outline" onClick={clearSearch} size="sm">
+                      Clear Search
+                    </Button>
+                  </div>
 
+                  {results.map((result, index) => (
+                    <motion.div
+                      key={result.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <BloodBankCard
+                        bloodBank={result}
+                        onRequestBlood={handleRequestBlood}
+                        formatExpiryDate={formatExpiryDate}
+                        getUrgencyColor={getUrgencyColor}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-12"
+                >
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg max-w-md mx-auto">
+                    <MagnifyingGlassIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      No blood banks found
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6">
+                      Try adjusting your search criteria or location.
+                    </p>
+                    <Button variant="outline" onClick={clearSearch}>
+                      Clear Search
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="initial"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-12"
+            >
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg max-w-md mx-auto">
+                <BeakerIcon className="h-16 w-16 text-red-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Search for Blood Banks
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400">
+                  Enter your search criteria above to find blood banks and check availability.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Emergency Notice */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="mt-8"
         >
-          <Card className="p-6 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10">
+          <Card className="p-6 border-l-4 border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20">
             <div className="flex items-center">
-              <PhoneIcon className="h-6 w-6 text-red-600 mr-3" />
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full mr-4">
+                <PhoneIcon className="h-6 w-6 text-red-600" />
+              </div>
               <div>
                 <h4 className="text-lg font-semibold text-red-800 dark:text-red-400">
                   Emergency Blood Needed?
@@ -354,6 +424,22 @@ export const SearchPage: React.FC = () => {
           </Card>
         </motion.div>
       </div>
+
+      {/* Blood Request Modal */}
+      {showRequestModal && selectedBloodBank && (
+        <BloodRequestModal
+          bloodBank={selectedBloodBank}
+          onClose={() => {
+            setShowRequestModal(false)
+            setSelectedBloodBank(null)
+          }}
+          onSuccess={() => {
+            setShowRequestModal(false)
+            setSelectedBloodBank(null)
+            toast.success('Blood request submitted successfully!')
+          }}
+        />
+      )}
     </div>
   )
 }
