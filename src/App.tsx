@@ -15,7 +15,9 @@ import { HistoryPage } from './pages/HistoryPage'
 import { SearchPage } from './pages/SearchPage'
 import { AboutPage } from './pages/AboutPage'
 import { ContactPage } from './pages/ContactPage'
+import toast from 'react-hot-toast'
 
+// ================= Protected Route =================
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile, loading } = useAuth()
 
@@ -28,16 +30,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500 dark:text-gray-400">Loading profile...</p>
-      </div>
-    )
+    toast.error("Profile not found")
+    return <Navigate to="/login" replace />
   }
 
   return <>{children}</>
 }
 
+// ================= Public Route =================
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth()
 
@@ -48,13 +48,8 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return !user ? <>{children}</> : <Navigate to="/dashboard" replace />
 }
 
+// ================= Main App Content (Move this ABOVE App) =================
 function AppContent() {
-  const { loading } = useAuth()
-
-  if (loading) {
-    return <PageLoader />
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <Header />
@@ -87,12 +82,13 @@ function AppContent() {
   )
 }
 
+// ================= App Wrapper =================
 function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <Router>
-          <AppContent />
+          <AppContent /> {/* <-- This was calling before AppContent is defined */}
         </Router>
       </AuthProvider>
     </ThemeProvider>

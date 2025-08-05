@@ -8,7 +8,7 @@ import {
   BuildingOfficeIcon,
   AcademicCapIcon,
   GlobeAltIcon
-} from '@heroicons/react/24/outline'
+} from '../components/icons'
 import { WaterDropletIcon } from '../components/icons/WaterDropletIcon'
 import { Card } from '../components/ui/Card'
 

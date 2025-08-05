@@ -9,7 +9,7 @@ import {
   XCircleIcon,
   ExclamationCircleIcon,
   FunnelIcon
-} from '@heroicons/react/24/outline'
+} from '../components/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Card } from '../components/ui/Card'

@@ -6,8 +6,7 @@ import {
   UserGroupIcon, 
   ClockIcon,
   ShieldCheckIcon
-} from '@heroicons/react/24/outline'
-import { MapPinIcon } from '@heroicons/react/24/solid' // Ensure correct icon path if needed
+} from '../components/icons' // Adjust the import path as necessary
 import { WaterDropletIcon } from '../components/icons/WaterDropletIcon'
 
 import { Button } from '../components/ui/Button'
