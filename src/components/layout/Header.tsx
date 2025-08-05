@@ -55,7 +55,7 @@ export const Header: React.FC = () => {
               whileHover={{ scale: 1.05 }}
               className="p-2 bg-gradient-to-r from-red-600 to-red-700 rounded-lg shadow-md"
             >
-              <WaterDropIcon className="h-6 w-6 text-white" />
+              <WaterDropletIcon className="h-6 w-6 text-white" />
             </motion.div>
             <span className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
               BloodBank+
@@ -199,7 +199,7 @@ export const Header: React.FC = () => {
                   </div>
                 )}
               </div>
-            <WaterDropletIcon className="h-6 w-6 text-white" />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
