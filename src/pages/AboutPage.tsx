@@ -5,17 +5,17 @@ import {
   UsersIcon,
   ShieldCheckIcon,
   ClockIcon,
-  WaterDropIcon,
   BuildingOfficeIcon,
   AcademicCapIcon,
   GlobeAltIcon
 } from '@heroicons/react/24/outline'
+import { WaterDropletIcon } from '../components/icons/WaterDropletIcon'
 import { Card } from '../components/ui/Card'
 
 export const AboutPage: React.FC = () => {
   const features = [
     {
-      icon: <WaterDropIcon className="h-8 w-8" />,
+      icon: <WaterDropletIcon className="h-8 w-8" />,
       title: 'Real-time Blood Tracking',
       description: 'Monitor blood inventory across multiple blood banks with live updates and availability status.'
     },
@@ -40,7 +40,7 @@ export const AboutPage: React.FC = () => {
     { label: 'Lives Saved', value: '50,000+', icon: <HeartIcon className="h-6 w-6" /> },
     { label: 'Active Donors', value: '15,000+', icon: <UsersIcon className="h-6 w-6" /> },
     { label: 'Partner Hospitals', value: '500+', icon: <BuildingOfficeIcon className="h-6 w-6" /> },
-    { label: 'Blood Banks', value: '150+', icon: <WaterDropIcon className="h-6 w-6" /> }
+    { label: 'Blood Banks', value: '150+', icon: <WaterDropletIcon className="h-6 w-6" /> }
   ]
 
   const team = [

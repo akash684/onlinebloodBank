@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { BeakerIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { ClockIcon } from '@heroicons/react/24/outline'
+import { BloodDropIcon } from '../icons/BloodDropIcon'
 import { Badge } from '../ui/Badge'
 
 interface BloodTypeCardProps {
@@ -41,7 +42,7 @@ export const BloodTypeCard: React.FC<BloodTypeCardProps> = ({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-            <BeakerIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+            <BloodDropIcon className="h-5 w-5" color="#DC2626" />
           </div>
           <span className="text-lg font-bold text-gray-900 dark:text-white">
             {bloodType.type}

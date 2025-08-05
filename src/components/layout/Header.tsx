@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Bars3Icon, 
   XMarkIcon,
-  WaterDropIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   CalendarIcon,
@@ -13,6 +12,7 @@ import {
   InformationCircleIcon,
   PhoneIcon
 } from '@heroicons/react/24/outline'
+import { WaterDropletIcon } from '../icons/WaterDropletIcon'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
 
@@ -199,7 +199,7 @@ export const Header: React.FC = () => {
                   </div>
                 )}
               </div>
-            </div>
+            <WaterDropletIcon className="h-6 w-6 text-white" />
           </motion.div>
         )}
       </AnimatePresence>

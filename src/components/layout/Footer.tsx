@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { BeakerIcon, HeartIcon } from '@heroicons/react/24/outline' // Use BeakerIcon instead of WaterDropIcon
+import { HeartIcon } from '@heroicons/react/24/outline'
+import { WaterDropletIcon } from '../icons/WaterDropletIcon'
 
 export const Footer: React.FC = () => {
   return (
@@ -11,7 +12,7 @@ export const Footer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-red-600 rounded-lg">
-                <BeakerIcon className="h-6 w-6 text-white" /> {/* Corrected Icon */}
+                <WaterDropletIcon className="h-6 w-6 text-white" />
               </div>
               <span className="text-xl font-bold">BloodBank+</span>
             </div>
