@@ -6,9 +6,8 @@ import {
   EnvelopeIcon, 
   LockClosedIcon, 
   PhoneIcon,
-  MapPinIcon,
-  BeakerIcon // Replaced WaterDropIcon with BeakerIcon
-} from '@heroicons/react/24/outline'
+  BeakerIcon
+} from '../../components/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'

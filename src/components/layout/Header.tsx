@@ -10,9 +10,9 @@ import {
   ClockIcon,
   MagnifyingGlassIcon,
   InformationCircleIcon,
-  PhoneIcon
-} from '@heroicons/react/24/outline'
-import { WaterDropletIcon } from '../icons/WaterDropletIcon'
+  PhoneIcon,
+  WaterDropIcon
+} from '../icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
 
@@ -55,7 +55,7 @@ export const Header: React.FC = () => {
               whileHover={{ scale: 1.05 }}
               className="p-2 bg-gradient-to-r from-red-600 to-red-700 rounded-lg shadow-md"
             >
-              <WaterDropletIcon className="h-6 w-6 text-white" />
+              <WaterDropIcon className="h-6 w-6 text-white" />
             </motion.div>
             <span className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
               BloodBank+

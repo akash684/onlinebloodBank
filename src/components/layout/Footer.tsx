@@ -1,7 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { HeartIcon } from '@heroicons/react/24/outline'
-import { WaterDropletIcon } from '../icons/WaterDropletIcon'
+import { HeartIcon, WaterDropIcon } from '../icons'
 
 export const Footer: React.FC = () => {
   return (
@@ -12,7 +11,7 @@ export const Footer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-red-600 rounded-lg">
-                <WaterDropletIcon className="h-6 w-6 text-white" />
+                <WaterDropIcon className="h-6 w-6 text-white" />
               </div>
               <span className="text-xl font-bold">BloodBank+</span>
             </div>

@@ -1,7 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { ClockIcon } from '@heroicons/react/24/outline'
-import { BloodDropIcon } from '../icons/BloodDropIcon'
+import { ClockIcon, BloodDropIcon } from '../icons'
 import { Badge } from '../ui/Badge'
 
 interface BloodTypeCardProps {
