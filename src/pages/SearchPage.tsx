@@ -9,7 +9,7 @@ import {
   ExclamationTriangleIcon,
   ClockIcon
 } from '../components/icons'
-import { supabase } from '../lib/supabase'
+import { supabase, handleSupabaseError } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -103,14 +103,42 @@ export const SearchPage: React.FC = () => {
     setHasSearched(true)
 
     try {
-      // Build query for blood inventory with blood bank details
-      let query = supabase
+      // First, get blood banks that match search criteria
+      let bloodBankQuery = supabase
+        .from('users')
+        .select('id, name, phone, email')
+        .eq('role', 'blood_bank')
+        .eq('is_active', true)
+
+      // Apply search query filter (blood bank name)
+      if (searchQuery.trim()) {
+        bloodBankQuery = bloodBankQuery.ilike('name', `%${searchQuery.trim()}%`)
+      }
+
+      const { data: bloodBanks, error: bloodBankError } = await bloodBankQuery
+      
+      if (bloodBankError) {
+        handleSupabaseError(bloodBankError, 'search blood banks')
+        return
+      }
+
+      if (!bloodBanks || bloodBanks.length === 0) {
+        setResults([])
+        toast.error('No blood banks found matching your criteria')
+        return
+      }
+
+      const bloodBankIds = bloodBanks.map(bb => bb.id)
+
+      // Build query for blood inventory
+      let inventoryQuery = supabase
         .from('blood_inventory')
         .select(`
           id,
           blood_group,
           quantity,
           expiry_date,
+          status,
           status,
           blood_bank:blood_bank_id (
             id,
@@ -122,39 +150,29 @@ export const SearchPage: React.FC = () => {
         .eq('status', 'available')
         .gt('quantity', 0)
         .gte('expiry_date', new Date().toISOString().split('T')[0])
+        .in('blood_bank_id', bloodBankIds)
 
       // Apply blood type filter
       if (selectedBloodType) {
-        query = query.eq('blood_group', selectedBloodType)
+        inventoryQuery = inventoryQuery.eq('blood_group', selectedBloodType)
       }
 
-      // Apply search query filter (blood bank name)
-      if (searchQuery) {
-        const { data: bloodBanks } = await supabase
-          .from('users')
-          .select('id')
-          .eq('role', 'blood_bank')
-          .ilike('name', `%${searchQuery}%`)
+      const { data: inventory, error: inventoryError } = await inventoryQuery
 
-        if (bloodBanks && bloodBanks.length > 0) {
-          const bloodBankIds = bloodBanks.map(bb => bb.id)
-          query = query.in('blood_bank_id', bloodBankIds)
-        } else {
-          // No matching blood banks found
-          setResults([])
-          setLoading(false)
-          return
-        }
+      if (inventoryError) {
+        handleSupabaseError(inventoryError, 'search inventory')
+        return
       }
-
-      const { data: inventory, error } = await query
-
-      if (error) throw error
 
       // Group inventory by blood bank
       const bloodBankMap = new Map<string, BloodBankResult>()
 
       inventory?.forEach((item: BloodInventory) => {
+        if (!item.blood_bank) {
+          console.warn('Inventory item missing blood bank data:', item)
+          return
+        }
+        
         const bankId = item.blood_bank.id
         
         if (!bloodBankMap.has(bankId)) {
@@ -179,6 +197,10 @@ export const SearchPage: React.FC = () => {
       })
 
       const searchResults = Array.from(bloodBankMap.values())
+      
+      // Sort results by total units available (descending)
+      searchResults.sort((a, b) => b.totalUnits - a.totalUnits)
+      
       setResults(searchResults)
 
       if (searchResults.length === 0) {
@@ -189,7 +211,8 @@ export const SearchPage: React.FC = () => {
 
     } catch (error: any) {
       console.error('Search error:', error)
-      toast.error('Failed to search blood banks. Please try again.')
+      const message = error instanceof Error ? error.message : 'Failed to search blood banks. Please try again.'
+      toast.error(message)
     } finally {
       setLoading(false)
     }

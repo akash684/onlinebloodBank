@@ -6,7 +6,7 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline'
-import { supabase } from '../../lib/supabase'
+import { supabase, handleSupabaseError } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -136,6 +136,34 @@ export const BloodRequestModal: React.FC<BloodRequestModalProps> = ({
 
     setLoading(true)
     try {
+      // Validate user permissions
+      if (!user || !profile) {
+        throw new Error('User not authenticated')
+      }
+
+      if (profile.role !== 'recipient' && profile.role !== 'admin') {
+        throw new Error('Only recipients and admins can create blood requests')
+      }
+
+      // Check if blood bank has sufficient inventory
+      const { data: inventory, error: inventoryError } = await supabase
+        .from('blood_inventory')
+        .select('quantity')
+        .eq('blood_bank_id', bloodBank.id)
+        .eq('blood_group', formData.blood_group)
+        .eq('status', 'available')
+        .gte('expiry_date', new Date().toISOString().split('T')[0])
+
+      if (inventoryError) {
+        handleSupabaseError(inventoryError, 'check inventory')
+        return
+      }
+
+      const totalAvailable = inventory?.reduce((sum, item) => sum + item.quantity, 0) || 0
+      if (totalAvailable < formData.quantity) {
+        throw new Error(`Insufficient inventory. Only ${totalAvailable} units available.`)
+      }
+
       // Create blood request
       const { error } = await supabase
         .from('blood_requests')
@@ -153,10 +181,13 @@ export const BloodRequestModal: React.FC<BloodRequestModalProps> = ({
           required_by: formData.required_by
         }])
 
-      if (error) throw error
+      if (error) {
+        handleSupabaseError(error, 'create blood request')
+        return
+      }
 
       // Create notification for blood bank
-      await supabase
+      const { error: notificationError } = await supabase
         .from('notifications')
         .insert([{
           user_id: bloodBank.id,
@@ -164,10 +195,17 @@ export const BloodRequestModal: React.FC<BloodRequestModalProps> = ({
           type: 'blood_request'
         }])
 
+      if (notificationError) {
+        console.warn('Failed to create notification:', notificationError)
+        // Don't fail the entire operation for notification errors
+      }
+
+      toast.success('Blood request submitted successfully!')
       onSuccess()
     } catch (error: any) {
       console.error('Error submitting request:', error)
-      toast.error('Failed to submit blood request. Please try again.')
+      const message = error instanceof Error ? error.message : 'Failed to submit blood request. Please try again.'
+      toast.error(message)
     } finally {
       setLoading(false)
     }
