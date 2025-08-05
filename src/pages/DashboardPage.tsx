@@ -6,7 +6,7 @@ import {
   PlusIcon, BellIcon 
 } from '../components/icons'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { supabase, handleSupabaseError } from '../lib/supabase'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
@@ -154,103 +154,159 @@ export const DashboardPage: React.FC = () => {
   // --- INDIVIDUAL DATA LOADERS
 
   const fetchDonorData = async () => {
-    const { data, error } = await supabase
-      .from('donation_history')
-      .select(`id, donation_date, blood_group, status, blood_bank:blood_bank_id (name)`)
-      .eq('donor_id', profile?.id)
-      .order('donation_date', { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from('donation_history')
+        .select(`
+          id, 
+          donation_date, 
+          blood_group, 
+          status, 
+          blood_bank:blood_bank_id (name, phone)
+        `)
+        .eq('donor_id', profile?.id)
+        .order('donation_date', { ascending: false })
 
-    if (error) {
+      if (error) {
+        handleSupabaseError(error, 'fetch donation data')
+        return
+      }
+
+      const donations = data || []
+      setDonationHistory(donations)
+      
+      const scheduled = donations.filter((d: any) => d.status === 'pending')
+      const completed = donations.filter((d: any) => d.status === 'completed')
+      
+      setScheduledDonations(scheduled)
+      setStats(prev => ({
+        ...prev,
+        totalDonations: donations.length,
+        scheduledDonations: scheduled.length,
+        completedDonations: completed.length
+      }))
+    } catch (error) {
+      console.error('Error fetching donor data:', error)
       throw error
     }
-    setDonationHistory(data)
-    const scheduled = data.filter((d: any) => d.status === 'pending')
-    const completed = data.filter((d: any) => d.status === 'completed')
-    setScheduledDonations(scheduled)
-    setStats(prev => ({
-      ...prev,
-      totalDonations: data.length,
-      scheduledDonations: scheduled.length,
-      completedDonations: completed.length
-    }))
   }
 
   const fetchRecipientData = async () => {
-    const { data, error } = await supabase
-      .from('blood_requests')
-      .select('*')
-      .eq('requester_id', profile?.id)
-      .order('created_at', { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from('blood_requests')
+        .select('*')
+        .eq('requester_id', profile?.id)
+        .order('created_at', { ascending: false })
 
-    if (error) throw error
+      if (error) {
+        handleSupabaseError(error, 'fetch blood requests')
+        return
+      }
 
-    setBloodRequests(data)
-    const pending = data.filter((r: any) => r.status === 'pending')
-    setStats(prev => ({
-      ...prev,
-      bloodRequests: data.length,
-      pendingRequests: pending.length
-    }))
-  }
-
-  const fetchBloodBankData = async () => {
-    const { data: inventory, error: inventoryError } = await supabase
-      .from('blood_inventory')
-      .select('*')
-      .eq('blood_bank_id', profile?.id)
-    if (inventoryError) throw inventoryError
-
-    const { data: requests, error: requestsError } = await supabase
-      .from('blood_requests')
-      .select('*')
-      .eq('assigned_bank', profile?.id)
-      .order('created_at', { ascending: false })
-    if (requestsError) throw requestsError
-
-    if (inventory) {
-      const totalUnits = inventory.reduce((sum: number, item: any) => sum + item.quantity, 0)
-      setStats(prev => ({
-        ...prev,
-        availableUnits: totalUnits
-      }))
-    }
-
-    if (requests) {
+      const requests = data || []
       setBloodRequests(requests)
+      
       const pending = requests.filter((r: any) => r.status === 'pending')
       setStats(prev => ({
         ...prev,
         bloodRequests: requests.length,
         pendingRequests: pending.length
       }))
+    } catch (error) {
+      console.error('Error fetching recipient data:', error)
+      throw error
+    }
+  }
+
+  const fetchBloodBankData = async () => {
+    try {
+      // Fetch inventory data
+      const { data: inventory, error: inventoryError } = await supabase
+        .from('blood_inventory')
+        .select('*')
+        .eq('blood_bank_id', profile?.id)
+        .eq('status', 'available')
+        .gte('expiry_date', new Date().toISOString().split('T')[0])
+        
+      if (inventoryError) {
+        handleSupabaseError(inventoryError, 'fetch inventory')
+        return
+      }
+
+      // Fetch blood requests
+      const { data: requests, error: requestsError } = await supabase
+        .from('blood_requests')
+        .select('*')
+        .eq('assigned_bank', profile?.id)
+        .order('created_at', { ascending: false })
+        
+      if (requestsError) {
+        handleSupabaseError(requestsError, 'fetch requests')
+        return
+      }
+
+      const inventoryData = inventory || []
+      const requestsData = requests || []
+      
+      const totalUnits = inventoryData.reduce((sum: number, item: any) => sum + item.quantity, 0)
+      const pending = requestsData.filter((r: any) => r.status === 'pending')
+      
+      setBloodRequests(requestsData)
+      setStats(prev => ({
+        ...prev,
+        availableUnits: totalUnits,
+        bloodRequests: requestsData.length,
+        pendingRequests: pending.length
+      }))
+    } catch (error) {
+      console.error('Error fetching blood bank data:', error)
+      throw error
     }
   }
 
   const fetchNotifications = async () => {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', profile?.id)
-      .order('created_at', { ascending: false })
-      .limit(5)
-    if (error) throw error
-    setNotifications(data)
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', profile?.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+        
+      if (error) {
+        handleSupabaseError(error, 'fetch notifications')
+        return
+      }
+      
+      setNotifications(data || [])
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+      throw error
+    }
   }
 
   // HANDLERS
 
   const markNotificationAsRead = async (notificationId: string) => {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId)
-    if (error) {
-      toast.error('Failed to mark as read')
-      return
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        
+      if (error) {
+        handleSupabaseError(error, 'mark notification as read')
+        return
+      }
+      
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+      )
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+      toast.error('Failed to mark notification as read')
     }
-    setNotifications(prev =>
-      prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-    )
   }
 
   // HELPER DISPLAY
