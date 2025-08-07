@@ -34,6 +34,7 @@ const ROLES = [
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate()
   const { signUp } = useAuth()
+  
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
