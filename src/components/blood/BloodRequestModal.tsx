@@ -147,6 +147,7 @@ export const BloodRequestModal: React.FC<BloodRequestModalProps> = ({
 
       // Check if blood bank has sufficient inventory
       const { data: inventory, error: inventoryError } = await supabase
+        .schema('bloodbank')
         .from('blood_inventory')
         .select('quantity')
         .eq('blood_bank_id', bloodBank.id)
@@ -166,6 +167,7 @@ export const BloodRequestModal: React.FC<BloodRequestModalProps> = ({
 
       // Create blood request
       const { error } = await supabase
+        .schema('bloodbank')
         .from('blood_requests')
         .insert([{
           requester_id: user?.id,
@@ -188,6 +190,7 @@ export const BloodRequestModal: React.FC<BloodRequestModalProps> = ({
 
       // Create notification for blood bank
       const { error: notificationError } = await supabase
+        .schema('bloodbank')
         .from('notifications')
         .insert([{
           user_id: bloodBank.id,

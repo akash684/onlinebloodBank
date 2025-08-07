@@ -7,14 +7,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.')
 }
 
+console.log('Supabase Config:', {
+  url: supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  anonKeyLength: supabaseAnonKey?.length
+})
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  db: {
-    schema: 'bloodbank'
-  },
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   },
   realtime: {
     params: {
@@ -23,9 +27,31 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
+// Test connection on initialization
+supabase.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    console.error('Supabase auth session error:', error)
+  } else {
+    console.log('Supabase auth session:', data.session ? 'Active' : 'None')
+  }
+})
+
 // Enhanced error handling for Supabase operations
 export const handleSupabaseError = (error: any, operation: string) => {
   console.error(`Supabase ${operation} error:`, error)
+  
+  // Handle specific auth errors
+  if (error?.message?.includes('Invalid login credentials')) {
+    throw new Error('Invalid email or password')
+  }
+  
+  if (error?.message?.includes('Email not confirmed')) {
+    throw new Error('Please check your email and confirm your account')
+  }
+  
+  if (error?.message?.includes('User already registered')) {
+    throw new Error('An account with this email already exists')
+  }
   
   if (error?.code === 'PGRST116') {
     throw new Error('No data found for the requested operation')
@@ -43,6 +69,10 @@ export const handleSupabaseError = (error: any, operation: string) => {
     throw new Error('Insufficient permissions for this operation')
   }
   
+  if (error?.code === 'PGRST301') {
+    throw new Error('Database schema or table not found')
+  }
+  
   throw new Error(error?.message || `Failed to ${operation}`)
 }
 
@@ -51,7 +81,46 @@ export const createTypedQuery = <T>(
   table: string,
   select?: string
 ) => {
-  return supabase.from(table).select(select || '*') as any
+  // Use the bloodbank schema for all queries
+  return supabase.schema('bloodbank').from(table).select(select || '*') as any
+}
+
+// Helper function to get user profile with proper schema
+export const getUserProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .schema('bloodbank')
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  
+  if (error) {
+    handleSupabaseError(error, 'fetch user profile')
+    return null
+  }
+  
+  return data
+}
+
+// Helper function to create user profile
+export const createUserProfile = async (userId: string, profileData: any) => {
+  const { data, error } = await supabase
+    .schema('bloodbank')
+    .from('users')
+    .insert([{ 
+      id: userId, 
+      ...profileData,
+      is_active: true 
+    }])
+    .select()
+    .single()
+  
+  if (error) {
+    handleSupabaseError(error, 'create user profile')
+    return null
+  }
+  
+  return data
 }
 
 // Database types for TypeScript support

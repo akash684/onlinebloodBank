@@ -105,6 +105,7 @@ export const SearchPage: React.FC = () => {
     try {
       // First, get blood banks that match search criteria
       let bloodBankQuery = supabase
+        .schema('bloodbank')
         .from('users')
         .select('id, name, phone, email')
         .eq('role', 'blood_bank')
@@ -132,6 +133,7 @@ export const SearchPage: React.FC = () => {
 
       // Build query for blood inventory
       let inventoryQuery = supabase
+        .schema('bloodbank')
         .from('blood_inventory')
         .select(`
           id,

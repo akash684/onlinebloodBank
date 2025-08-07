@@ -15,6 +15,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { SearchPage } from './pages/SearchPage'
 import { AboutPage } from './pages/AboutPage'
 import { ContactPage } from './pages/ContactPage'
+import { AuthTest } from './components/debug/AuthTest'
 import toast from 'react-hot-toast'
 
 // ================= Protected Route =================
@@ -59,6 +60,7 @@ function AppContent() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/debug" element={<AuthTest />} />
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

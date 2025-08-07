@@ -1,7 +1,7 @@
 // =================== AuthContext.tsx ===================
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase, handleSupabaseError } from '../lib/supabase'
+import { supabase, handleSupabaseError, getUserProfile, createUserProfile } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface UserProfile {
@@ -43,8 +43,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Debug logging
   useEffect(() => {
+    console.log('Auth state changed:', { 
+      hasUser: !!user, 
+      hasProfile: !!profile, 
+      hasSession: !!session, 
+      loading 
+    })
+  }, [user, profile, session, loading])
+
+  useEffect(() => {
+    console.log('Setting up auth state listener...')
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session ? 'Found' : 'None')
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
@@ -56,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change event:', event, session ? 'Session exists' : 'No session')
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user) {
@@ -73,21 +87,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchProfile = async (userId: string) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) {
-        handleSupabaseError(error, 'fetch profile')
+      console.log('Fetching profile for user:', userId)
+      
+      const data = await getUserProfile(userId)
+      
+      if (!data) {
+        console.warn('User profile not found for:', userId)
+        toast.error('User profile not found. Please complete your registration.')
+        setProfile(null)
         return
       }
       
-      if (!data) {
-        throw new Error('User profile not found')
-      }
-      
+      console.log('Profile fetched successfully:', data.role)
       setProfile(data)
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -102,35 +113,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true)
       
+      console.log('Starting sign up process for:', email, 'Role:', userData.role)
+      
       // Validate required fields
       if (!userData.name || !userData.role || !userData.blood_type) {
         throw new Error('Name, role, and blood type are required')
       }
       
-      const { data, error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        }
+      })
+      
       if (error) {
+        console.error('Auth signup error:', error)
         handleSupabaseError(error, 'sign up')
         return
       }
 
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([{ 
-            id: data.user.id, 
-            email, 
-            ...userData,
-            is_active: true 
-          }])
+      console.log('Auth signup successful:', data.user?.id)
 
-        if (profileError) {
-          handleSupabaseError(profileError, 'create profile')
-          return
+      if (data.user) {
+        console.log('Creating user profile...')
+        const profileData = await createUserProfile(data.user.id, {
+          email,
+          ...userData
+        })
+
+        if (!profileData) {
+          throw new Error('Failed to create user profile')
         }
         
-        toast.success('Account created successfully!')
+        console.log('User profile created successfully')
+        
+        // If email confirmation is disabled, set the profile immediately
+        if (data.session) {
+          setProfile(profileData)
+        }
+        
+        if (data.user.email_confirmed_at) {
+          toast.success('Account created successfully!')
+        } else {
+          toast.success('Account created! Please check your email to confirm your account.')
+        }
       }
     } catch (error: any) {
+      console.error('Sign up error:', error)
       const message = error instanceof Error ? error.message : 'Failed to create account'
       toast.error(message)
       throw error
@@ -142,13 +173,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true)
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      console.log('Starting sign in process for:', email)
+      
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      
       if (error) {
+        console.error('Auth signin error:', error)
         handleSupabaseError(error, 'sign in')
         return
       }
+      
+      console.log('Auth signin successful:', data.user?.id)
+      
+      if (data.user && !data.user.email_confirmed_at) {
+        toast.error('Please check your email and confirm your account before signing in.')
+        return
+      }
+      
       toast.success('Welcome back!')
     } catch (error: any) {
+      console.error('Sign in error:', error)
       const message = error instanceof Error ? error.message : 'Failed to sign in'
       toast.error(message)
       throw error
@@ -159,14 +203,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      console.log('Signing out...')
       const { error } = await supabase.auth.signOut()
       if (error) {
         handleSupabaseError(error, 'sign out')
         return
       }
       setProfile(null)
+      console.log('Sign out successful')
       toast.success('Signed out successfully')
     } catch (error: any) {
+      console.error('Sign out error:', error)
       const message = error instanceof Error ? error.message : 'Failed to sign out'
       toast.error(message)
       throw error
@@ -177,7 +224,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) throw new Error('No user logged in')
 
     try {
+      console.log('Updating profile:', updates)
       const { error } = await supabase
+        .schema('bloodbank')
         .from('users')
         .update(updates)
         .eq('id', user.id)
@@ -188,8 +237,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       setProfile(prev => prev ? { ...prev, ...updates } : null)
+      console.log('Profile updated successfully')
       toast.success('Profile updated successfully')
     } catch (error: any) {
+      console.error('Update profile error:', error)
       const message = error instanceof Error ? error.message : 'Failed to update profile'
       toast.error(message)
       throw error
@@ -200,4 +251,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-

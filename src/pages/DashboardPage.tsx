@@ -156,6 +156,7 @@ export const DashboardPage: React.FC = () => {
   const fetchDonorData = async () => {
     try {
       const { data, error } = await supabase
+        .schema('bloodbank')
         .from('donation_history')
         .select(`
           id, 
@@ -194,6 +195,7 @@ export const DashboardPage: React.FC = () => {
   const fetchRecipientData = async () => {
     try {
       const { data, error } = await supabase
+        .schema('bloodbank')
         .from('blood_requests')
         .select('*')
         .eq('requester_id', profile?.id)
@@ -223,6 +225,7 @@ export const DashboardPage: React.FC = () => {
     try {
       // Fetch inventory data
       const { data: inventory, error: inventoryError } = await supabase
+        .schema('bloodbank')
         .from('blood_inventory')
         .select('*')
         .eq('blood_bank_id', profile?.id)
@@ -236,6 +239,7 @@ export const DashboardPage: React.FC = () => {
 
       // Fetch blood requests
       const { data: requests, error: requestsError } = await supabase
+        .schema('bloodbank')
         .from('blood_requests')
         .select('*')
         .eq('assigned_bank', profile?.id)
@@ -268,6 +272,7 @@ export const DashboardPage: React.FC = () => {
   const fetchNotifications = async () => {
     try {
       const { data, error } = await supabase
+        .schema('bloodbank')
         .from('notifications')
         .select('*')
         .eq('user_id', profile?.id)
@@ -291,6 +296,7 @@ export const DashboardPage: React.FC = () => {
   const markNotificationAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
+        .schema('bloodbank')
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId)
