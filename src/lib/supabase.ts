@@ -18,7 +18,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: 'pkce',
+    storage: window.localStorage
   },
   realtime: {
     params: {
@@ -36,6 +37,19 @@ supabase.auth.getSession().then(({ data, error }) => {
   }
 })
 
+// Test database connection
+supabase
+  .schema('bloodbank')
+  .from('users')
+  .select('count')
+  .limit(1)
+  .then(({ data, error }) => {
+    if (error) {
+      console.error('Database connection error:', error)
+    } else {
+      console.log('Database connection: ✅ Connected to bloodbank schema')
+    }
+  })
 // Enhanced error handling for Supabase operations
 export const handleSupabaseError = (error: any, operation: string) => {
   console.error(`Supabase ${operation} error:`, error)
